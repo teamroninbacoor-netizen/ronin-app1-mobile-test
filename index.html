@@ -2541,42 +2541,94 @@ function roninMyEntries(){
 }
 </script>
 
+<script src="ronin-api-config.js"></script>
 <script>
-/* App #1 GitHub Pages accessibility prototype.
-   google.script.run exists only on Apps Script HTML Service pages.
-   These placeholder responses let the unchanged UI boot without accessing
-   private Spreadsheet content or relying on broken Apps Script redirects.
-   Do NOT deploy this file as a live-results application. */
+/* APP #1 GitHub Pages — PHASE 2 TEST ONLY.
+   Keeps the unchanged page renderer while loading ONLY the approved public
+   Judges & Sponsors fields via a separate read-only Apps Script JSONP API.
+   All other calls remain the prior prototype's non-live placeholders.
+   The public API must not contain private exhibitor/admin information. */
 (function () {
   const emptyStats = {total:0,judged:0,pending:0,judging:0,scratched:0,completed:0,categories:0};
   const reply = {
     getAnnouncementSettings: {settings:{EVENT_DATE:'DECEMBER 5–6, 2026',VENUE:'MOLINO IV, BACOOR, CAVITE',EVENT_NAME:'STRIKE OF A RONIN',EVENT_SUBTITLE:'BACOOR BETTA SHOW 2026',EVENT_TAGLINE:'UNITED BY PASSION • FIGHT AS ONE'}},
     getDashboardCriticalData: {settings:{},statistics:emptyStats,categories:[],nowJudging:[]},
-    getDashboardSecondaryData: {recentWinners:[],categoryResults:[],awards:[],judges:[],sponsors:[]},
-    getDashboardJudgesSponsorsData: {judges:[],sponsors:[]},
-    getCategoryEntries: [],
-    getOfficialCategoryResults: null,
-    searchEntry: null,
+    getCategoryEntries: [], getOfficialCategoryResults:null, searchEntry:null,
     getDashboardData: {settings:{},statistics:emptyStats,categories:[],recentWinners:[],categoryResults:[],nowJudging:[],awards:[],judges:[],sponsors:[]}
   };
-  const runner = new Proxy({}, {
-    get(_target, method){
-      if (method === 'withSuccessHandler') return function(cb) { runner._success=cb; return runner; };
-      if (method === 'withFailureHandler') return function(cb) { runner._failure=cb; return runner; };
-      if (method === 'withUserObject') return function() { return runner; };
-      if (method === '_success' || method === '_failure') return _target[method];
-      return function () {
-        const success = _target._success;
-        _target._success = null;
-        _target._failure = null;
-        queueMicrotask(function () {
-          if (typeof success === 'function') success(Object.prototype.hasOwnProperty.call(reply,method) ? reply[method] : null);
+  let publicLoadPromise=null;
+  function loadPublicRoster(){
+    if(publicLoadPromise) return publicLoadPromise;
+    publicLoadPromise=new Promise(function(resolve){
+      const url=String(window.RONIN_PUBLIC_API_URL||'').trim();
+      if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec(?:\?.*)?$/.test(url)){
+        console.warn('Ronin Phase 2 test: public roster API URL not configured.');
+        resolve({judges:[],sponsors:[],error:'Public API not configured'});
+        return;
+      }
+      let finished=false,script=null;
+      const callback='roninPublicDataCallback';
+      function finish(data){
+        if(finished)return;
+        finished=true;window.clearTimeout(timeout);
+        delete window[callback];
+        if(script)script.remove();
+        if(!data||data.ok!==true||!Array.isArray(data.judges)||!Array.isArray(data.sponsors)){
+          console.warn('Ronin public roster API returned invalid response:',data);
+          resolve({judges:[],sponsors:[],error:'Public API unavailable'});return;
+        }
+        resolve({judges:data.judges,sponsors:data.sponsors});
+      }
+      const timeout=window.setTimeout(function(){finish(null);},15000);
+      window[callback]=function(data){finish(data);};
+      script=document.createElement('script');
+      const separator=url.includes('?')?'&':'?';
+      script.src=url+separator+'resource=public-roster&callback='+callback+'&_='+Date.now();
+      script.async=true;
+      script.onerror=function(){finish(null);};
+      document.head.appendChild(script);
+    });
+    return publicLoadPromise;
+  }
+  function showStatus(text){
+    ['judges','sponsors'].forEach(function(id){
+      const node=document.getElementById(id);
+      if(node && !node.dataset.roninTestNotice){
+        node.dataset.roninTestNotice='1';
+        node.textContent=text;
+      }
+    });
+  }
+  const runner=new Proxy({}, {
+    get(_target,method){
+      if(method==='withSuccessHandler') return function(cb){_target._success=cb;return runner;};
+      if(method==='withFailureHandler') return function(cb){_target._failure=cb;return runner;};
+      if(method==='withUserObject')return function(){return runner;};
+      if(method==='_success'||method==='_failure')return _target[method];
+      return function(){
+        const success=_target._success, failure=_target._failure;
+        _target._success=null;_target._failure=null;
+        if(method==='getDashboardJudgesSponsorsData'||method==='getDashboardSecondaryData'){
+          loadPublicRoster().then(function(roster){
+            if(roster.error){
+              showStatus('Judges and Sponsors live data is unavailable in this test.');
+              if(typeof failure==='function')failure(new Error(roster.error));
+              return;
+            }
+            const result=method==='getDashboardJudgesSponsorsData' ? roster :
+              {recentWinners:[],categoryResults:[],awards:[],judges:roster.judges,sponsors:roster.sponsors};
+            if(typeof success==='function') success(result);
+          });
+          return;
+        }
+        window.queueMicrotask(function(){
+          if(typeof success==='function')success(Object.prototype.hasOwnProperty.call(reply,method)?reply[method]:null);
         });
       };
     },
-    set(target,key,value){ target[key]=value; return true; }
+    set(target,key,value){target[key]=value;return true;}
   });
-  window.google = {script:{run:runner}};
+  window.google={script:{run:runner}};
 })();
 </script>
 
