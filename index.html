@@ -2532,12 +2532,12 @@ function roninMyEntries(){
    * VIEW MY ENTRIES uses APP #2 production.
    * REGISTER FOR THE SHOW remains unchanged.
    */
-  var app2Url = 'https://script.google.com/macros/s/AKfycbxq66p8hVn0_Cvvu29HmKjdm_vRvCs5nsNtolklkRJilRmx0cygLxC64lVMUZSdU5wGPA/exec';
+  var app2Url = 'https://teamroninbacoor-netizen.github.io/ronin-app2a-mobile-test/';
   var destination = app2Url + '?registrationId=' + encodeURIComponent(registrationId);
 
   if (note) note.textContent = 'Opening your registration status in the exhibitor system...';
 
-  window.open(destination, '_blank');
+  window.location.assign(destination);
 }
 </script>
 
